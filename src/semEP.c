@@ -1,5 +1,6 @@
 /**
  * Copyright (C) 2013-2016 Universidad Simón Bolívar
+ * Copyright (C) 2017 Forschungszentrum L3S
  *
  * Copying: GNU GENERAL PUBLIC LICENSE Version 2
  * @author Guillermo Palma <gvpalma@usb.ve>
@@ -13,7 +14,7 @@
 #include <limits.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <unistd.h>
+#include <unistd.h> 
 #include <stdbool.h>
 #include <assert.h>
 #include <time.h>
@@ -32,6 +33,7 @@
 #define NOCLUSTER    -1
 #define INFTY         INT_MAX
 #define EPSILON       10e-7
+#define MARK          200000000
 
 #define CHECK_ELEM(e)					      \
      do {						      \
@@ -215,7 +217,8 @@ static void build_graph_to_coloring_matrix(struct graph_adj *gc,
 	       y = vn->data[j];
 	       c = y->pos1;
 	       d = y->pos2;
-	       dissimilar = (similarity(v1->data[a], v1->data[c]) <= threshold1) || (similarity(v2->data[b], v2->data[d]) <= threshold2); 
+	       dissimilar = (similarity(v1->data[a], v1->data[c]) <= threshold1) ||
+		    (similarity(v2->data[b], v2->data[d]) <= threshold2); 
 	       if (rel_constr) {
 		    if (strcmp(vn->data[i]->relation, vn->data[j]->relation) == 0)
 			 dif_relation = false;			 
@@ -602,18 +605,18 @@ static inline int get_color(const struct node_ptr_array *node_color, int pos)
 static void update_saturation_degree(const struct graph_adj *g, pqueue_t *pq, int node,
 				     const struct node_ptr_array *node_color)
 {
-     int r;
-     int color;
-     struct arc *current;
-     
+     int r, color;
+     struct arc_array adjs;
+     unsigned int i, nr;
+	  
      color = get_color(node_color, node);
      assert(color != NOCOLOR);
-     current = g->adj_list[node];
-     while(current != NULL) {
-	  r = increase_key(g, pq, current->to, color);
+     adjs = get_adjacent_list(g, node);
+     nr = adjs.nr;
+     for (i = 0; i < nr; i++) {
+	  r = increase_key(g, pq, adjs.data[i].to, color);
 	  if (r == -1)
 	       fatal("Error in update saturation degree\n");
-	  current = current->next;
      }
 }
 
@@ -648,22 +651,23 @@ static int greatest_saturation_node(const struct graph_adj *g, pqueue_t *pq,
 static bool *get_ady_used_color(const struct graph_adj *g,
 				const struct node_ptr_array *node_color, int node)
 {
-     struct arc *current;
+     //struct arc *current;
+     struct arc_array adjs;
      bool *color_used;
      int color;
      size_t alloc;
-
+     unsigned int i, nr;
+     
      alloc = g->n_nodes*sizeof(bool);
      color_used = xmalloc(alloc);
      memset(color_used, false, alloc);
-     current = g->adj_list[node];
-     while (current != NULL) {
-	  color = get_color(node_color, current->to);
+     adjs = get_adjacent_list(g, node);
+     nr = adjs.nr;
+     for (i = 0; i < nr; i++) {
+	  color = get_color(node_color, adjs.data[i].to);
 	  assert(color < g->n_nodes);
-	  if (color != NOCOLOR) {
+	  if (color != NOCOLOR) 
 	       color_used[color] = true;
-	  }
-	  current = current->next;
      }
      return color_used;
 }
@@ -849,11 +853,12 @@ static void coloring(const struct graph_adj *g,
 {
      struct color *cptr;
      struct node *nptr;
-     int n, colored_nodes, new_node, e1, e2;
+     int colored_nodes, new_node, e1, e2;
      pqueue_t pq_saturation;
      struct int_array free_colors = {0, 0, NULL};
      info_partition_t ip;
-	  
+     long n;
+     
      colored_nodes = 0;
      ALLOC_GROW(free_colors.data, (unsigned int)g->n_nodes, free_colors.alloc);
      pq_init(&pq_saturation);
@@ -921,7 +926,6 @@ static double get_density_average(clusters_t *c)
      }
      return r/n;
 }
-
 
 /*************************************
  *************************************
@@ -1160,7 +1164,7 @@ double semEP_solver(const struct matrix *lmatrix,
      build_graph_to_coloring_matrix(&gc, color_nodes, lterms, rterms, lthreshold, rthreshold, rel_constraint);
      tf = clock();
      printf("Time to build the graph to coloring: %.4f secs\n", (double)(tf-ti)/CLOCKS_PER_SEC);
-     printf("Graph to Coloring - Num. of Nodes: %d; Num. of Edges: %d\n", gc.n_nodes, gc.n_arcs/2);
+     printf("Graph to Coloring - Num. of Nodes: %d; Num. of Edges: %ld\n", gc.n_nodes, gc.n_arcs/2);
      ti = clock();
      if (gc.n_nodes != 0) {
 	  coloring(&gc, color_nodes, &c, lterms, rterms);
