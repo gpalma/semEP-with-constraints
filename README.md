@@ -169,8 +169,4 @@ I hope you find semEP an useful tool. Please, let me know
 any comment, problem, bug, or suggestion.
 
 Guillermo Palma
-[gpalma at usb dot ve ](mailto:gvpalma@usb.ve)
-
-
-
-
+[palma at l3s dot de](mailto:palma@l3s.de)
